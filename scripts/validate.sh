@@ -124,13 +124,13 @@ check_common_issues() {
     local issues_found=0
     
     # Check for DROP TABLE without IF EXISTS
-    if grep -q "DROP TABLE [^I]" "$file" && ! grep -q "DROP TABLE IF EXISTS" "$file"; then
+    if grep -qi "DROP TABLE" "$file" && ! grep -qi "DROP TABLE IF EXISTS" "$file"; then
         print_warning "Safety check: $filename contains DROP TABLE without IF EXISTS"
         issues_found=$((issues_found + 1))
     fi
     
     # Check for DELETE/TRUNCATE without WHERE (potential data loss)
-    if grep -q "DELETE FROM.*;" "$file" && ! grep -q "DELETE FROM.*WHERE" "$file"; then
+    if grep -qi "DELETE FROM" "$file" && ! grep -qi "DELETE FROM.*WHERE" "$file"; then
         print_warning "Safety check: $filename contains DELETE without WHERE clause"
         issues_found=$((issues_found + 1))
     fi
