@@ -12,7 +12,7 @@ Thank you for contributing to the Clients database repository! This guide will h
 2. **Set up your local environment:**
    ```bash
    # Clone repository
-   git clone https://github.com/MathieuBengle/lumanitech-erp-db-clients.git
+   git clone <repository-url>
    cd lumanitech-erp-db-clients
    
    # Create local database

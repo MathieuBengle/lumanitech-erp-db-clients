@@ -103,14 +103,14 @@ check_sql_syntax() {
     
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     
-    # Dry-run syntax check (doesn't execute, just parses)
-    if mysql --batch --skip-column-names -e "source $file" --force --dry-run 2>/dev/null || \
-       grep -v "^--" "$file" | grep -v "^[[:space:]]*$" > /dev/null; then
+    # Basic SQL syntax check - just verify file has valid SQL-like content
+    # Full validation requires a database connection which CI may not have
+    if grep -v "^--" "$file" | grep -v "^[[:space:]]*$" | grep -Eq "(CREATE|ALTER|DROP|INSERT|SELECT|UPDATE|DELETE)" ; then
         print_success "SQL syntax: $filename"
         PASSED_CHECKS=$((PASSED_CHECKS + 1))
         return 0
     else
-        print_error "SQL syntax: $filename (potential syntax errors)"
+        print_error "SQL syntax: $filename (no SQL statements found)"
         FAILED_CHECKS=$((FAILED_CHECKS + 1))
         return 1
     fi
