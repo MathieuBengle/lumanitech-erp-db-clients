@@ -1,0 +1,118 @@
+name: SQL Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - 'migrations/**'
+      - 'schema/**'
+      - 'seeds/**'
+      - 'scripts/**'
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'migrations/**'
+      - 'schema/**'
+      - 'seeds/**'
+      - 'scripts/**'
+
+jobs:
+  validate:
+    name: Validate SQL Files
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Make validation script executable
+        run: chmod +x scripts/validate.sh
+      
+      - name: Run SQL validation
+        run: ./scripts/validate.sh
+      
+      - name: Check for sensitive data
+        run: |
+          # Additional check for common sensitive patterns
+          if grep -rE "(password|api[_-]?key|secret|token)\s*[:=]\s*['\"][^'\"]{8,}" migrations/ schema/ seeds/ 2>/dev/null; then
+            echo "⚠️  Warning: Potential sensitive data detected!"
+            echo "Please review the files above and ensure no credentials are committed."
+            exit 1
+          fi
+          echo "✓ No sensitive data patterns detected"
+      
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- SQL validation: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Files checked: migrations/, schema/, seeds/" >> $GITHUB_STEP_SUMMARY
+
+  lint-sql:
+    name: Lint SQL (Optional)
+    runs-on: ubuntu-latest
+    if: false  # Disabled by default - enable if you want to use sqlfluff
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      
+      - name: Install sqlfluff
+        run: pip install sqlfluff
+      
+      - name: Lint SQL files
+        run: |
+          sqlfluff lint migrations/ schema/ --dialect mysql || true
+          # Using || true to not fail the build, just show warnings
+
+  test-migrations:
+    name: Test Migrations (Optional)
+    runs-on: ubuntu-latest
+    if: false  # Disabled by default - enable if you want to test against MySQL
+    
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: test_password
+          MYSQL_DATABASE: lumanitech_erp_clients
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Wait for MySQL
+        run: |
+          until mysqladmin ping -h 127.0.0.1 -P 3306 -u root -ptest_password --silent; do
+            echo 'waiting for mysql...'
+            sleep 2
+          done
+      
+      - name: Apply migrations
+        run: |
+          for f in migrations/*.sql; do
+            [ "$f" = "migrations/TEMPLATE.sql" ] && continue
+            echo "Applying $f"
+            mysql -h 127.0.0.1 -P 3306 -u root -ptest_password lumanitech_erp_clients < "$f"
+          done
+      
+      - name: Verify schema
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -u root -ptest_password lumanitech_erp_clients -e "SHOW TABLES;"
+          mysql -h 127.0.0.1 -P 3306 -u root -ptest_password lumanitech_erp_clients -e "SELECT * FROM schema_migrations;"
