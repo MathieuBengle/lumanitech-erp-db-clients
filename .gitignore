@@ -1,0 +1,42 @@
+# Database dumps and backups
+*.sql.gz
+*.sql.zip
+*.dump
+*.bak
+backup/
+dumps/
+
+# Temporary files
+*.tmp
+*.temp
+*~
+.DS_Store
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+
+# OS files
+Thumbs.db
+.directory
+
+# Log files
+*.log
+logs/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Build and test artifacts
+test-results/
+coverage/
+*.test.sql
+
+# Connection configuration (should be stored securely)
+*connection*.cnf
+my.cnf
