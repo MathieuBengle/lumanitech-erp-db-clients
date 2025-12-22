@@ -119,30 +119,25 @@ git clone <repository-url>
 cd lumanitech-erp-db-clients
 ```
 
-2. Set up your local MySQL database:
+2. Make the deployment script executable (required once):
 ```bash
-mysql -u root -p -e "CREATE DATABASE lumanitech_erp_clients;"
+chmod +x ./scripts/deploy.sh
 ```
 
-3. Apply schema (if needed for fresh setup):
+3. Store credentials with mysql_config_editor (the script defaults to login-path `local` / user `admin`):
 ```bash
-mysql -u root -p lumanitech_erp_clients < schema/tables/*.sql
+mysql_config_editor set --login-path=local \
+    --host=localhost \
+    --user=admin \
+    --password
 ```
 
-4. Run migrations:
+4. Deploy schema, migrations, and maintenance seeds:
 ```bash
-# Migrations are typically run by the API service
-# For manual testing, apply in order:
-for f in migrations/*.sql; do
-    echo "Applying $f"
-    mysql -u root -p lumanitech_erp_clients < "$f"
-done
+./scripts/deploy.sh --login-path=local --with-seeds
 ```
 
-5. Load seed data (optional):
-```bash
-mysql -u root -p lumanitech_erp_clients < seeds/dev/clients_seed.sql
-```
+The new deployment script installs the schema (tables, views, procedures, functions), applies every versioned migration under `migrations/`, and conditionally loads `seeds/dev/`. It prints the login path (or reports that it will prompt for a password) so you always know which credentials are in use.
 
 ## Contributing
 
