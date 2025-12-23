@@ -107,7 +107,7 @@ for f in migrations/*.sql; do
 done
 
 # Apply specific migration
-mysql -u root -p database_name < migrations/20231215143000_your_description.sql
+mysql -u root -p database_name < migrations/V004_your_description.sql
 
 # Check applied migrations
 mysql -u root -p database_name -e "SELECT version, description, applied_at FROM schema_migrations ORDER BY version;"
