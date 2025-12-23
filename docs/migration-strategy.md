@@ -20,17 +20,17 @@ This repository implements a **forward-only migration strategy** for database sc
 
 All migrations follow this naming convention:
 ```
-YYYYMMDDHHMMSS_description.sql
+V###_description.sql
 ```
 
 **Components:**
-- `YYYYMMDDHHMMSS`: Timestamp ensuring chronological and alphabetical ordering
+- `V###`: Version number with leading zeros (V001, V002, V003, etc.)
 - `description`: Brief, lowercase, snake_case description of the change
 
 **Examples:**
-- `20231215143000_create_clients_table.sql`
-- `20231215150000_add_email_index_to_clients.sql`
-- `20231216090000_alter_clients_add_status_column.sql`
+- `V001_create_clients_table.sql`
+- `V002_add_email_index_to_clients.sql`
+- `V003_alter_clients_add_status_column.sql`
 
 ### 3. Idempotency
 
@@ -72,8 +72,8 @@ Each migration records itself in the `schema_migrations` table:
 
 ```sql
 INSERT INTO schema_migrations (version, description) 
-VALUES ('20231215143000', 'create_clients_table')
-ON DUPLICATE KEY UPDATE version = version;
+VALUES ('V001', 'create_clients_table')
+ON DUPLICATE KEY UPDATE applied_at = CURRENT_TIMESTAMP;
 ```
 
 ### 5. Rollback via Forward Migration
@@ -81,10 +81,10 @@ ON DUPLICATE KEY UPDATE version = version;
 To undo changes, create a new migration that reverses the previous one:
 
 ```sql
--- Original: 20231215143000_add_notes_column.sql
+-- Original: V004_add_notes_column.sql
 ALTER TABLE clients ADD COLUMN notes TEXT;
 
--- Rollback: 20231216100000_remove_notes_column.sql
+-- Rollback: V005_remove_notes_column.sql
 ALTER TABLE clients DROP COLUMN IF EXISTS notes;
 ```
 
@@ -92,20 +92,20 @@ ALTER TABLE clients DROP COLUMN IF EXISTS notes;
 
 ### Creating a New Migration
 
-1. **Generate timestamp:**
+1. **Determine next version number:**
    ```bash
-   date +%Y%m%d%H%M%S
-   # Output: 20231215143000
+   # List existing migrations to see the latest version
+   ls migrations/V*.sql | sort | tail -1
    ```
 
 2. **Create migration file:**
    ```bash
-   touch migrations/20231215143000_your_description.sql
+   touch migrations/V004_your_description.sql
    ```
 
 3. **Write migration with standard header:**
    ```sql
-   -- Migration: 20231215143000_your_description
+   -- Migration: V004_your_description
    -- Description: Detailed description of what this migration does
    -- Author: Your Name
    -- Date: 2023-12-15
@@ -115,17 +115,17 @@ ALTER TABLE clients DROP COLUMN IF EXISTS notes;
    
    -- Record this migration
    INSERT INTO schema_migrations (version, description) 
-   VALUES ('20231215143000', 'your_description')
-   ON DUPLICATE KEY UPDATE version = version;
+   VALUES ('V004', 'your_description')
+   ON DUPLICATE KEY UPDATE applied_at = CURRENT_TIMESTAMP;
    
    -- Rollback instructions (for reference only):
    -- DROP TABLE IF EXISTS ...;
-   -- DELETE FROM schema_migrations WHERE version = '20231215143000';
+   -- DELETE FROM schema_migrations WHERE version = 'V004';
    ```
 
 4. **Test locally:**
    ```bash
-   mysql -u root -p database_name < migrations/20231215143000_your_description.sql
+   mysql -u root -p database_name < migrations/V004_your_description.sql
    ```
 
 5. **Validate:**
@@ -135,7 +135,7 @@ ALTER TABLE clients DROP COLUMN IF EXISTS notes;
 
 6. **Commit and push:**
    ```bash
-   git add migrations/20231215143000_your_description.sql
+   git add migrations/V004_your_description.sql
    git commit -m "Add migration: your_description"
    git push
    ```
@@ -204,44 +204,44 @@ mysql -u root -p database_name -e "SELECT * FROM schema_migrations ORDER BY vers
 ### Adding a Column
 
 ```sql
--- Migration: 20231215143000_add_email_verified_to_clients.sql
+-- Migration: V004_add_email_verified_to_clients.sql
 ALTER TABLE clients 
 ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE 
 COMMENT 'Whether email address has been verified';
 
 INSERT INTO schema_migrations (version, description) 
-VALUES ('20231215143000', 'add_email_verified_to_clients')
-ON DUPLICATE KEY UPDATE version = version;
+VALUES ('V004', 'add_email_verified_to_clients')
+ON DUPLICATE KEY UPDATE applied_at = CURRENT_TIMESTAMP;
 ```
 
 ### Adding an Index
 
 ```sql
--- Migration: 20231215144000_add_email_index_to_clients.sql
+-- Migration: V005_add_email_index_to_clients.sql
 CREATE INDEX IF NOT EXISTS idx_clients_email ON clients(email);
 
 INSERT INTO schema_migrations (version, description) 
-VALUES ('20231215144000', 'add_email_index_to_clients')
-ON DUPLICATE KEY UPDATE version = version;
+VALUES ('V005', 'add_email_index_to_clients')
+ON DUPLICATE KEY UPDATE applied_at = CURRENT_TIMESTAMP;
 ```
 
 ### Modifying Column (Safe Pattern)
 
 ```sql
--- Migration: 20231215145000_extend_client_code_length.sql
+-- Migration: V006_extend_client_code_length.sql
 -- Extending VARCHAR is generally safe (does not require table rebuild in MySQL 5.7+)
 ALTER TABLE clients 
 MODIFY COLUMN client_code VARCHAR(100) NOT NULL COMMENT 'Unique client code/reference';
 
 INSERT INTO schema_migrations (version, description) 
-VALUES ('20231215145000', 'extend_client_code_length')
-ON DUPLICATE KEY UPDATE version = version;
+VALUES ('V006', 'extend_client_code_length')
+ON DUPLICATE KEY UPDATE applied_at = CURRENT_TIMESTAMP;
 ```
 
 ### Data Migration
 
 ```sql
--- Migration: 20231215150000_populate_client_type_from_legacy.sql
+-- Migration: V007_populate_client_type_from_legacy.sql
 -- Migrate data from old system
 UPDATE clients 
 SET client_type = 'business' 
@@ -252,22 +252,22 @@ SET client_type = 'individual'
 WHERE client_type IS NULL AND tax_id IS NULL;
 
 INSERT INTO schema_migrations (version, description) 
-VALUES ('20231215150000', 'populate_client_type_from_legacy')
-ON DUPLICATE KEY UPDATE version = version;
+VALUES ('V007', 'populate_client_type_from_legacy')
+ON DUPLICATE KEY UPDATE applied_at = CURRENT_TIMESTAMP;
 ```
 
 ### Creating a View
 
 ```sql
--- Migration: 20231215151000_create_active_clients_view.sql
+-- Migration: V008_create_active_clients_view.sql
 CREATE OR REPLACE VIEW active_clients AS
 SELECT id, client_code, company_name, email, status
 FROM clients
 WHERE status = 'active';
 
 INSERT INTO schema_migrations (version, description) 
-VALUES ('20231215151000', 'create_active_clients_view')
-ON DUPLICATE KEY UPDATE version = version;
+VALUES ('V008', 'create_active_clients_view')
+ON DUPLICATE KEY UPDATE applied_at = CURRENT_TIMESTAMP;
 ```
 
 ## Handling Failures
@@ -317,9 +317,9 @@ Before merging a migration:
 
 **A: No.** Once merged, migrations are immutable. Create a new migration to make changes.
 
-### Q: How do I handle merge conflicts in migration timestamps?
+### Q: How do I handle merge conflicts in migration version numbers?
 
-**A: Regenerate the timestamp** for your migration to be newer than the conflicting one, rename your file, update the version in the SQL, and resolve the conflict.
+**A: Renumber your migration** to be the next available version, rename your file, update the version in the SQL, and resolve the conflict.
 
 ### Q: What if I need to rollback a migration?
 

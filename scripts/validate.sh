@@ -40,13 +40,13 @@ check_migration_naming() {
     
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     
-    # Pattern: YYYYMMDDHHMMSS_description.sql
-    if [[ $filename =~ ^[0-9]{14}_[a-z0-9_]+\.sql$ ]]; then
+    # Pattern: V###_description.sql
+    if [[ $filename =~ ^V[0-9]{3}_[a-z0-9_]+\.sql$ ]]; then
         print_success "Migration naming: $filename"
         PASSED_CHECKS=$((PASSED_CHECKS + 1))
         return 0
     else
-        print_error "Migration naming: $filename (should be YYYYMMDDHHMMSS_description.sql)"
+        print_error "Migration naming: $filename (should be V###_description.sql)"
         FAILED_CHECKS=$((FAILED_CHECKS + 1))
         return 1
     fi

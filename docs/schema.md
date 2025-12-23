@@ -22,14 +22,11 @@ Tracks which migrations have been applied to the database.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| id | INT | PRIMARY KEY, AUTO_INCREMENT | Unique identifier |
-| version | VARCHAR(14) | NOT NULL, UNIQUE | Migration version (timestamp) |
+| version | VARCHAR(50) | PRIMARY KEY | Migration version (V###) |
 | description | VARCHAR(255) | NOT NULL | Migration description |
 | applied_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | When migration was applied |
-| checksum | VARCHAR(64) | NULL | Optional checksum for integrity |
 
 **Indexes:**
-- `idx_version` on `version`
 - `idx_applied_at` on `applied_at`
 
 ### clients
@@ -162,11 +159,11 @@ Indexes are created on:
 
 ## Migration History
 
-Migrations are applied in chronological order:
+Migrations are applied in sequential order:
 
-1. `20231215100000_create_schema_migrations_table.sql` - Migration tracking
-2. `20231215110000_create_clients_table.sql` - Main clients table
-3. `20231215120000_create_active_clients_view.sql` - Active clients view
+1. `V001_create_schema_migrations_table.sql` - Migration tracking
+2. `V002_create_clients_table.sql` - Main clients table
+3. `V003_create_active_clients_view.sql` - Active clients view
 
 For complete migration history, see the `migrations/` directory.
 

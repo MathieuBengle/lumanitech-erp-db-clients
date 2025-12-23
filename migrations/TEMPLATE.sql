@@ -1,4 +1,4 @@
--- Migration: YYYYMMDDHHMMSS_description
+-- Migration: V###_description
 -- Description: Detailed description of what this migration does and why
 -- Author: Your Name
 -- Date: YYYY-MM-DD
@@ -32,10 +32,10 @@ COMMENT='Description of what this table stores';
 
 -- Record this migration
 INSERT INTO schema_migrations (version, description) 
-VALUES ('YYYYMMDDHHMMSS', 'description')
-ON DUPLICATE KEY UPDATE version = version;
+VALUES ('V###', 'description')
+ON DUPLICATE KEY UPDATE applied_at = CURRENT_TIMESTAMP;
 
 -- Rollback instructions (for reference only - create new migration to rollback):
 -- Include SQL statements that would reverse this migration
 -- DROP TABLE IF EXISTS example_table;
--- DELETE FROM schema_migrations WHERE version = 'YYYYMMDDHHMMSS';
+-- DELETE FROM schema_migrations WHERE version = 'V###';

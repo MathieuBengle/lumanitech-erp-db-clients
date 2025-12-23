@@ -1,4 +1,4 @@
--- Migration: 20231215110000_create_clients_table
+-- Migration: V002_create_clients_table
 -- Description: Create the main clients table for storing customer information
 -- Author: Database Team
 -- Date: 2023-12-15
@@ -54,9 +54,9 @@ COMMENT='Main clients/customers table';
 
 -- Record this migration
 INSERT INTO schema_migrations (version, description) 
-VALUES ('20231215110000', 'create_clients_table')
-ON DUPLICATE KEY UPDATE version = version;
+VALUES ('V002', 'create_clients_table')
+ON DUPLICATE KEY UPDATE applied_at = CURRENT_TIMESTAMP;
 
 -- Rollback instructions (for reference only - create new migration to rollback):
 -- DROP TABLE IF EXISTS clients;
--- DELETE FROM schema_migrations WHERE version = '20231215110000';
+-- DELETE FROM schema_migrations WHERE version = 'V002';
