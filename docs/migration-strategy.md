@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repository implements a **forward-only migration strategy** for database schema management. This approach ensures consistency, traceability, and safety across all environments.
+This repository implements a **forward-only migration strategy** for database schema management using sequential version numbering.
 
 ## Core Principles
 
@@ -12,7 +12,7 @@ This repository implements a **forward-only migration strategy** for database sc
 
 **Why?**
 - Different environments may be at different migration states
-- Modifying existing migrations can cause checksum mismatches
+- Modifying existing migrations breaks reproducibility
 - Historical record of all schema changes is preserved
 - Prevents accidental data loss
 
@@ -24,7 +24,7 @@ V###_description.sql
 ```
 
 **Components:**
-- `V###`: Version number with leading zeros (V001, V002, V003, etc.)
+- `V###`: Version number with leading zeros (V000, V001, V002, etc.)
 - `description`: Brief, lowercase, snake_case description of the change
 
 **Examples:**
@@ -44,26 +44,9 @@ CREATE TABLE IF NOT EXISTS table_name (...);
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_name ON table_name(column);
 
--- Columns (check before adding)
+-- Columns (MySQL 8.0.29+)
 ALTER TABLE table_name 
 ADD COLUMN IF NOT EXISTS column_name VARCHAR(255);
-
--- For MySQL < 8.0.29, use procedural approach:
-DELIMITER $$
-CREATE PROCEDURE add_column_if_not_exists()
-BEGIN
-  IF NOT EXISTS (
-    SELECT * FROM information_schema.COLUMNS 
-    WHERE TABLE_SCHEMA = DATABASE() 
-    AND TABLE_NAME = 'table_name' 
-    AND COLUMN_NAME = 'column_name'
-  ) THEN
-    ALTER TABLE table_name ADD COLUMN column_name VARCHAR(255);
-  END IF;
-END$$
-DELIMITER ;
-CALL add_column_if_not_exists();
-DROP PROCEDURE add_column_if_not_exists;
 ```
 
 ### 4. Self-Tracking
@@ -105,27 +88,27 @@ ALTER TABLE clients DROP COLUMN IF EXISTS notes;
 
 3. **Write migration with standard header:**
    ```sql
+   -- =============================================================================
    -- Migration: V004_your_description
    -- Description: Detailed description of what this migration does
    -- Author: Your Name
-   -- Date: 2023-12-15
+   -- Date: 2025-12-24
+   -- =============================================================================
    
    -- Your SQL here
    CREATE TABLE IF NOT EXISTS ...;
    
-   -- Record this migration
+   -- =============================================================================
+   -- Migration Tracking
+   -- =============================================================================
    INSERT INTO schema_migrations (version, description) 
    VALUES ('V004', 'your_description')
    ON DUPLICATE KEY UPDATE applied_at = CURRENT_TIMESTAMP;
-   
-   -- Rollback instructions (for reference only):
-   -- DROP TABLE IF EXISTS ...;
-   -- DELETE FROM schema_migrations WHERE version = 'V004';
    ```
 
 4. **Test locally:**
    ```bash
-   mysql -u root -p database_name < migrations/V004_your_description.sql
+   ./scripts/apply-migrations.sh --login-path=local
    ```
 
 5. **Validate:**
@@ -142,32 +125,14 @@ ALTER TABLE clients DROP COLUMN IF EXISTS notes;
 
 ### Migration Execution
 
-Migrations are executed by the API service during deployment:
+Migrations are executed by deployment scripts in sequential order:
 
-1. API connects to database
-2. Checks `schema_migrations` table for applied migrations
-3. Identifies unapplied migrations (sorted alphabetically/chronologically)
-4. Executes each migration in order
-5. Records successful migrations in `schema_migrations`
-6. Reports any failures
-
-### Manual Execution (Development)
-
-For local testing:
-
-```bash
-# Apply all pending migrations
-for f in migrations/*.sql; do
-    echo "Applying $f"
-    mysql -u root -p database_name < "$f"
-done
-
-# Apply specific migration
-mysql -u root -p database_name < migrations/V004_your_description.sql
-
-# Check applied migrations
-mysql -u root -p database_name -e "SELECT * FROM schema_migrations ORDER BY version;"
-```
+1. Connect to database
+2. Check `schema_migrations` table for applied migrations
+3. Identify unapplied migrations (sorted by version number)
+4. Execute each migration in order
+5. Record successful migrations in `schema_migrations`
+6. Report any failures
 
 ## Best Practices
 
@@ -229,9 +194,10 @@ ON DUPLICATE KEY UPDATE applied_at = CURRENT_TIMESTAMP;
 
 ```sql
 -- Migration: V006_extend_client_code_length.sql
--- Extending VARCHAR is generally safe (does not require table rebuild in MySQL 5.7+)
+-- Extending VARCHAR is generally safe
 ALTER TABLE clients 
-MODIFY COLUMN client_code VARCHAR(100) NOT NULL COMMENT 'Unique client code/reference';
+MODIFY COLUMN client_code VARCHAR(100) NOT NULL 
+COMMENT 'Unique client code/reference';
 
 INSERT INTO schema_migrations (version, description) 
 VALUES ('V006', 'extend_client_code_length')
@@ -242,7 +208,6 @@ ON DUPLICATE KEY UPDATE applied_at = CURRENT_TIMESTAMP;
 
 ```sql
 -- Migration: V007_populate_client_type_from_legacy.sql
--- Migrate data from old system
 UPDATE clients 
 SET client_type = 'business' 
 WHERE client_type IS NULL AND tax_id IS NOT NULL;
@@ -299,7 +264,7 @@ ON DUPLICATE KEY UPDATE applied_at = CURRENT_TIMESTAMP;
 
 Before merging a migration:
 
-- [ ] Timestamp is correct and unique
+- [ ] Version number is correct and sequential
 - [ ] Description is clear and accurate
 - [ ] Migration is idempotent (when possible)
 - [ ] Tested on local development database
@@ -333,10 +298,6 @@ Before merging a migration:
 
 **A: Use anonymized production dumps** in a staging environment. Test for performance and correctness.
 
-### Q: What about schema.sql files?
-
-**A: They are reference only** showing current state. Migrations are the source of truth. Don't modify schema files directly.
-
 ## Version Control
 
 - All migrations must be committed to version control
@@ -345,8 +306,8 @@ Before merging a migration:
 - Require pull request review before merging
 - Tag releases with applied migrations
 
-## References
+## See Also
 
-- [MySQL ALTER TABLE Documentation](https://dev.mysql.com/doc/refman/8.0/en/alter-table.html)
-- [MySQL Data Types](https://dev.mysql.com/doc/refman/8.0/en/data-types.html)
-- [Database Migration Best Practices](https://www.liquibase.org/get-started/best-practices)
+- [schema.md](schema.md) - Current schema documentation
+- [QUICKSTART.md](QUICKSTART.md) - Quick start guide
+- [DATA_DICTIONARY.md](DATA_DICTIONARY.md) - Detailed data dictionary

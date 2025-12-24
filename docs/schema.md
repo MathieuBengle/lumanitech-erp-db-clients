@@ -2,29 +2,44 @@
 
 ## Overview
 
-This document describes the database schema for the Lumanitech ERP Clients module.
+**Database Name**: lumanitech_erp_clients  
+**Character Set**: utf8mb4  
+**Collation**: utf8mb4_unicode_ci  
+**Engine**: InnoDB  
 
-## Database Information
+This database stores client and customer master data for the Lumanitech ERP system.
 
-- **Database Name**: `lumanitech_erp_clients`
-- **Character Set**: `utf8mb4`
-- **Collation**: `utf8mb4_unicode_ci`
-- **Engine**: InnoDB (default)
-- **MySQL Version**: 8.0+
+## Schema Structure
+
+```
+schema/
+├── 01_create_database.sql
+├── tables/
+│   ├── schema_migrations.sql
+│   └── clients.sql
+├── views/
+│   └── active_clients.sql
+├── procedures/
+├── functions/
+├── triggers/
+└── indexes/
+```
+
+**Naming conventions:**
+- procedures: `sp_<name>.sql`
+- triggers: `trg_<name>.sql`
 
 ## Tables
 
 ### schema_migrations
 
-Tracks which migrations have been applied to the database.
-
-**Purpose**: Migration tracking and version control
+Tracks all applied database migrations.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| version | VARCHAR(50) | PRIMARY KEY | Migration version (V###) |
-| description | VARCHAR(255) | NOT NULL | Migration description |
-| applied_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | When migration was applied |
+| version | VARCHAR(50) | PRIMARY KEY | Migration version (e.g., V001, V002) |
+| description | VARCHAR(255) | NOT NULL | Brief description of the migration |
+| applied_at | TIMESTAMP | NOT NULL, DEFAULT CURRENT_TIMESTAMP | When the migration was applied |
 
 **Indexes:**
 - `idx_applied_at` on `applied_at`
@@ -33,14 +48,12 @@ Tracks which migrations have been applied to the database.
 
 Main table storing client/customer information.
 
-**Purpose**: Store all client data for the ERP system
-
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | id | INT | PRIMARY KEY, AUTO_INCREMENT | Unique identifier |
 | client_code | VARCHAR(50) | NOT NULL, UNIQUE | Unique client reference code |
 | company_name | VARCHAR(255) | NOT NULL | Company or individual name |
-| legal_name | VARCHAR(255) | NULL | Legal business name |
+| legal_name | VARCHAR(255) | NULL | Legal business name if different |
 | email | VARCHAR(255) | NULL | Primary email address |
 | phone | VARCHAR(50) | NULL | Primary phone number |
 | website | VARCHAR(255) | NULL | Company website |
@@ -81,12 +94,9 @@ Main table storing client/customer information.
 
 Filtered view showing only active clients with essential information.
 
-**Purpose**: Quick access to active client records
-
 **Columns**: id, client_code, company_name, legal_name, email, phone, city, state_province, country, client_type, credit_limit, payment_terms, created_at, updated_at
 
-**Filter**: `status = 'active'`
-
+**Filter**: `status = 'active'`  
 **Ordering**: `company_name` ASC
 
 ## Stored Procedures
@@ -97,14 +107,9 @@ _None currently defined_
 
 _None currently defined_
 
-## Relationships
+## Triggers
 
-Currently, the schema is designed to be self-contained. Future expansions may include:
-
-- Contacts table (many contacts per client)
-- Addresses table (multiple addresses per client)
-- Client notes/history table
-- Client documents table
+_None currently defined_
 
 ## Data Types Reference
 
@@ -122,6 +127,25 @@ Currently, the schema is designed to be self-contained. Future expansions may in
 - `suspended`: Client account is suspended
 - `archived`: Client is archived (historical record)
 
+## Migration History
+
+Migrations are applied in sequential order:
+
+1. `V000_create_schema_migrations_table.sql` - Migration tracking
+2. `V001_create_clients_table.sql` - Main clients table
+3. `V002_create_active_clients_view.sql` - Active clients view
+
+For complete migration history, see the `migrations/` directory.
+
+## Relationships
+
+Currently, the schema is designed to be self-contained. Future expansions may include:
+
+- Contacts table (many contacts per client)
+- Addresses table (multiple addresses per client)
+- Client notes/history table
+- Client documents table
+
 ## Indexing Strategy
 
 Indexes are created on:
@@ -131,15 +155,6 @@ Indexes are created on:
 4. Frequently queried columns (status, client_code, email)
 5. Columns used in WHERE clauses
 6. Columns used in ORDER BY clauses
-
-## Character Set and Collation
-
-- **utf8mb4**: Full Unicode support including emoji and special characters
-- **utf8mb4_unicode_ci**: Case-insensitive Unicode collation
-
-## Storage Engine
-
-- **InnoDB**: Provides ACID compliance, foreign key support, and row-level locking
 
 ## Maintenance
 
@@ -157,31 +172,8 @@ Indexes are created on:
 - Use appropriate column types (VARCHAR vs TEXT)
 - Monitor query performance with EXPLAIN
 
-## Migration History
+## See Also
 
-Migrations are applied in sequential order:
-
-1. `V001_create_schema_migrations_table.sql` - Migration tracking
-2. `V002_create_clients_table.sql` - Main clients table
-3. `V003_create_active_clients_view.sql` - Active clients view
-
-For complete migration history, see the `migrations/` directory.
-
-## Future Enhancements
-
-Potential future schema additions:
-
-- Client contacts (with relationships)
-- Multiple addresses per client
-- Client categories/tags
-- Client documents and attachments
-- Audit trail/change history
-- Client relationships (parent/child companies)
-- Custom fields support
-
-## Support
-
-For schema questions or changes:
-- Review `docs/migration-strategy.md`
-- Create a migration following the template
-- Submit pull request for review
+- [DATA_DICTIONARY.md](DATA_DICTIONARY.md) - Detailed data dictionary
+- [migration-strategy.md](migration-strategy.md) - Migration guidelines
+- [ERD.md](ERD.md) - Entity relationship diagrams

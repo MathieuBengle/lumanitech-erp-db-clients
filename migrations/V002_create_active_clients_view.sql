@@ -1,4 +1,4 @@
--- Migration: V003_create_active_clients_view
+-- Migration: V002_create_active_clients_view
 -- Description: Create view for active clients
 -- Author: Database Team
 -- Date: 2023-12-15
@@ -29,9 +29,9 @@ ORDER BY
 
 -- Record this migration
 INSERT INTO schema_migrations (version, description) 
-VALUES ('V003', 'create_active_clients_view')
+VALUES ('V002', 'create_active_clients_view')
 ON DUPLICATE KEY UPDATE applied_at = CURRENT_TIMESTAMP;
 
 -- Rollback instructions (for reference only - create new migration to rollback):
 -- DROP VIEW IF EXISTS active_clients;
--- DELETE FROM schema_migrations WHERE version = 'V003';
+-- DELETE FROM schema_migrations WHERE version = 'V002';
