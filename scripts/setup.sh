@@ -19,7 +19,7 @@ main() {
     
     # Create database
     print_info "Creating database if not exists..."
-    mysql_exec < "$PROJECT_ROOT/schema/01_create_database.sql"
+    mysql_exec_no_db < "$PROJECT_ROOT/schema/01_create_database.sql"
     
     # Deploy schema components in order
     for dir in tables views procedures functions triggers indexes; do

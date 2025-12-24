@@ -14,6 +14,7 @@ DB_HOST="${DB_HOST:-localhost}"
 DB_USER="${DB_USER:-}"
 DB_PASS="${DB_PASS:-}"
 LOGIN_PATH="${LOGIN_PATH:-}"
+LOG_LEVEL="${LOG_LEVEL:-info}"
 
 # =============================================================================
 # Helper Functions
@@ -36,6 +37,12 @@ print_warning() {
     echo -e "\033[0;33m[WARNING]\033[0m $1" >&2
 }
 
+print_debug() {
+    if [[ "$LOG_LEVEL" == "debug" ]]; then
+        echo -e "\033[0;36m[DEBUG]\033[0m $1" >&2
+    fi
+}
+
 print_error() {
     echo -e "\033[0;31m[ERROR]\033[0m $1" >&2
 }
@@ -47,6 +54,26 @@ print_error() {
 parse_mysql_args() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
+                --host=*)
+                    DB_HOST="${1#*=}"
+                    shift
+                    ;;
+                --user=*)
+                    DB_USER="${1#*=}"
+                    shift
+                    ;;
+                --password=*)
+                    DB_PASS="${1#*=}"
+                    shift
+                    ;;
+                --database=*)
+                    DB_NAME="${1#*=}"
+                    shift
+                    ;;
+                --login-path=*)
+                    LOGIN_PATH="${1#*=}"
+                    shift
+                    ;;
             --host)
                 DB_HOST="$2"
                 shift 2
@@ -82,15 +109,31 @@ parse_mysql_args() {
             DB_USER="root"
         fi
     fi
+
+    # When running under WSL2, prefer TCP loopback to avoid using a UNIX socket
+    # (MySQL client treats 'localhost' as socket; 127.0.0.1 forces TCP).
+    if is_wsl2; then
+        if [[ -z "$DB_HOST" || "$DB_HOST" == "localhost" ]]; then
+            DB_HOST="127.0.0.1"
+            print_debug "WSL2 detected: forcing DB_HOST to 127.0.0.1 to use TCP"
+        fi
+    fi
 }
 
 get_mysql_cmd() {
     local cmd_args=()
-    
+    # If using a login-path, add it first then the host so mysql client
+    # accepts the login-path correctly. Otherwise include host and explicit
+    # user/password args.
     if [[ -n "$LOGIN_PATH" ]]; then
         cmd_args+=(--login-path="$LOGIN_PATH")
+        if [[ -n "$DB_HOST" ]]; then
+            cmd_args+=(-h "$DB_HOST")
+        fi
     else
-        cmd_args+=(-h "$DB_HOST")
+        if [[ -n "$DB_HOST" ]]; then
+            cmd_args+=(-h "$DB_HOST")
+        fi
         cmd_args+=(-u "$DB_USER")
         if [[ -n "$DB_PASS" ]]; then
             cmd_args+=(-p"$DB_PASS")
@@ -104,14 +147,43 @@ get_mysql_cmd() {
     echo "${cmd_args[@]}"
 }
 
+get_mysql_cmd_no_db() {
+    local cmd_args=()
+
+    if [[ -n "$LOGIN_PATH" ]]; then
+        cmd_args+=(--login-path="$LOGIN_PATH")
+        if [[ -n "$DB_HOST" ]]; then
+            cmd_args+=(-h "$DB_HOST")
+        fi
+    else
+        if [[ -n "$DB_HOST" ]]; then
+            cmd_args+=(-h "$DB_HOST")
+        fi
+        cmd_args+=(-u "$DB_USER")
+        if [[ -n "$DB_PASS" ]]; then
+            cmd_args+=(-p"$DB_PASS")
+        fi
+    fi
+
+    echo "${cmd_args[@]}"
+}
+
 mysql_exec() {
     local cmd_args
     read -ra cmd_args <<< "$(get_mysql_cmd)"
     mysql "${cmd_args[@]}" "$@"
 }
 
+mysql_exec_no_db() {
+    local cmd_args
+    read -ra cmd_args <<< "$(get_mysql_cmd_no_db)"
+    mysql "${cmd_args[@]}" "$@"
+}
+
 test_connection() {
-    if ! mysql_exec -e "SELECT 1" &>/dev/null; then
+    local cmd_args
+    read -ra cmd_args <<< "$(get_mysql_cmd_no_db)"
+    if ! mysql "${cmd_args[@]}" -e "SELECT 1" &>/dev/null; then
         print_error "Failed to connect to MySQL"
         return 1
     fi
