@@ -1,36 +1,140 @@
-# Scripts Directory
+# Database Scripts
 
-This directory contains the CI/CD helpers for the Clients database repository.
+This directory contains scripts for database deployment, validation, and management.
 
-## Available Scripts
+## Scripts Overview
 
-### deploy.sh
-**Purpose**: Deploy the schema, migrations, and optional development seeds while reusing `mysql_config_editor` login paths (default login-path `local` + user `admin`).
+### Deployment Scripts
 
-**Usage**:
+- **deploy.sh** - Main deployment script (schema + migrations + optional seeds)
+- **setup.sh** - Deploy database schema only
+- **apply-migrations.sh** - Apply migrations only
+- **load-seeds.sh** - Load development seed data only
+
+### Validation Scripts
+
+- **validate.sh** - Run all validation checks
+- **validate-migrations.sh** - Validate migration files
+- **validate-sql-syntax.sh** - Basic SQL syntax validation
+
+### Utility Scripts
+
+- **mysql-common.sh** - Common MySQL utilities (sourced by other scripts)
+- **test-migrations.sh** - Test migrations on temporary database
+- **setup_login.sh** - Helper to configure mysql_config_editor login path
+
+## Authentication
+
+### Recommended: Login Path (mysql_config_editor)
+
+The recommended way to authenticate is using `mysql_config_editor`:
+
 ```bash
-# Ensure the script is executable (run once)
-chmod +x ./scripts/deploy.sh
+# Configure login path (one-time setup)
+mysql_config_editor set --login-path=local \
+  --host=localhost \
+  --user=admin \
+  --password
 
-# Basic deployment (schema + migrations)
-./scripts/deploy.sh
-
-# Include seed data for local development
-./scripts/deploy.sh --with-seeds
-
-# Override login path or database name
-./scripts/deploy.sh --login-path=local --database=lumanitech_erp_clients
+# Use with scripts
+./scripts/deploy.sh --login-path=local
 ```
 
-**Notes**:
-- The script auto-verifies the configured login path and prints instructions if it is missing.
-- If no login path is provided or found, it falls back to an interactive password prompt that is reused for the entire run.
-- Schema directories (`schema/tables`, `schema/views`, `schema/procedures`, `schema/functions`), the `migrations/` folder, and `seeds/dev/` are executed in alphabetical order.
+**WSL2 local note:**  
+Use a login-path configured with user 'admin' (for example:  
+`mysql_config_editor set --login-path=local --host=localhost --user=admin --password`).
 
-### validate.sh
-**Purpose**: Validate SQL files for syntax and naming conventions (CI-ready).
+### Alternative: Command Line Options
 
-**Usage**:
 ```bash
+./scripts/deploy.sh --host=localhost --user=admin --password=yourpass
+```
+
+## Usage Examples
+
+### Full Deployment
+
+```bash
+# Deploy everything (schema + migrations)
+./scripts/deploy.sh --login-path=local
+
+# Deploy with seed data
+./scripts/deploy.sh --login-path=local --with-seeds
+```
+
+### Schema Only
+
+```bash
+./scripts/setup.sh --login-path=local
+```
+
+### Migrations Only
+
+```bash
+./scripts/apply-migrations.sh --login-path=local
+```
+
+### Seeds Only
+
+```bash
+./scripts/load-seeds.sh --login-path=local
+```
+
+### Validation
+
+```bash
+# Run all validations
 ./scripts/validate.sh
+
+# Validate specific components
+./scripts/validate-migrations.sh
+./scripts/validate-sql-syntax.sh
 ```
+
+### Testing
+
+```bash
+# Test migrations on temporary database
+./scripts/test-migrations.sh --login-path=local
+```
+
+## Database Configuration
+
+Default values:
+- **Database**: lumanitech_erp_clients
+- **Host**: localhost
+- **User**: admin (on WSL2) or root (on other systems)
+
+Override with command-line options:
+```bash
+./scripts/deploy.sh --database=mydb --host=192.168.1.100 --user=myuser
+```
+
+## Common Options
+
+All deployment scripts support:
+- `--host HOST` - MySQL host (default: localhost)
+- `--user USER` - MySQL user (default: admin on WSL2, root otherwise)
+- `--password PASS` - MySQL password
+- `--database DB` - Database name (default: lumanitech_erp_clients)
+- `--login-path PATH` - Use mysql_config_editor login path
+- `-h, --help` - Show help message
+
+## File Naming Conventions
+
+### Procedures
+Files in `schema/procedures/` must follow the pattern: `sp_<name>.sql`
+
+Example: `sp_update_client_status.sql`
+
+### Triggers
+Files in `schema/triggers/` must follow the pattern: `trg_<name>.sql`
+
+Example: `trg_audit_client_changes.sql`
+
+## Notes
+
+- All scripts must be run from the project root or with proper paths
+- Scripts are designed to be idempotent where possible
+- Migration order is important - always run in V### sequence
+- Seed data is for development only - never use in production

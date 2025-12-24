@@ -23,15 +23,20 @@ This database is **owned and managed by the Clients API**. The API service is re
 │   ├── tables/         # Table definitions
 │   ├── views/          # View definitions
 │   ├── procedures/     # Stored procedures
-│   └── functions/      # User-defined functions
+│   ├── functions/      # User-defined functions
+│   ├── triggers/       # Triggers
+│   └── indexes/        # Index definitions
 ├── migrations/         # Versioned migration scripts
-│   └── YYYYMMDDHHMMSS_description.sql
+│   └── V###_description.sql
 ├── seeds/              # Seed data for development/testing
 │   └── dev/           # Development seed data
 ├── docs/               # Documentation
-│   └── migration-strategy.md
-└── scripts/            # CI/CD validation scripts
-    └── validate.sh
+│   ├── migration-strategy.md
+│   └── schema.md
+└── scripts/            # CI/CD scripts
+    ├── deploy.sh
+    ├── validate.sh
+    └── README.md
 ```
 
 ## Migration Strategy
@@ -42,29 +47,29 @@ This repository follows a **forward-only migration** strategy:
 
 1. **Never modify existing migrations** - Once a migration is committed, it should never be changed
 2. **Always create new migrations** - To fix issues, create a new migration that corrects the problem
-3. **Sequential versioning** - Migrations are named with timestamp: `YYYYMMDDHHMMSS_description.sql`
+3. **Sequential versioning** - Migrations are named with version numbers: `V###_description.sql`
 4. **Idempotent when possible** - Migrations should check for existence before creating objects
 5. **Rollback via new migrations** - To undo changes, create a new migration that reverses them
 
 ### Migration Naming Convention
 
 ```
-YYYYMMDDHHMMSS_description.sql
+V###_description.sql
 ```
 
 Examples:
-- `20231215143000_create_clients_table.sql`
-- `20231215150000_add_email_index_to_clients.sql`
-- `20231216090000_alter_clients_add_status_column.sql`
+- `V001_create_clients_table.sql`
+- `V002_add_email_index_to_clients.sql`
+- `V003_alter_clients_add_status_column.sql`
 
 ### Creating a Migration
 
-1. Generate timestamp: `date +%Y%m%d%H%M%S`
-2. Create file: `migrations/YYYYMMDDHHMMSS_your_description.sql`
+1. Generate version number: determine next version from existing migrations
+2. Create file: `migrations/V###_your_description.sql`
 3. Write SQL with proper guards:
 
 ```sql
--- Migration: YYYYMMDDHHMMSS_your_description
+-- Migration: V###_your_description
 -- Description: Brief description of what this migration does
 -- Author: Your Name
 -- Date: YYYY-MM-DD
@@ -75,6 +80,11 @@ CREATE TABLE IF NOT EXISTS clients (
     name VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Record this migration
+INSERT INTO schema_migrations (version, description) 
+VALUES ('V###', 'your_description')
+ON DUPLICATE KEY UPDATE applied_at = CURRENT_TIMESTAMP;
 ```
 
 4. Test locally
@@ -82,7 +92,7 @@ CREATE TABLE IF NOT EXISTS clients (
 
 ### Migration Execution Order
 
-Migrations are executed in alphabetical order (timestamp ensures chronological order).
+Migrations are executed in sequential order (V001, V002, V003, etc.).
 The API service tracks which migrations have been applied using a `schema_migrations` table.
 
 ## Seed Data
@@ -143,7 +153,7 @@ The new deployment script installs the schema (tables, views, procedures, functi
 
 ### Making Schema Changes
 
-1. Create a new migration file with timestamp
+1. Create a new migration file with next version number
 2. Write idempotent SQL when possible
 3. Test migration locally
 4. Run validation: `./scripts/validate.sh`

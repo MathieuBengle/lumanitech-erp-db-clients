@@ -1,264 +1,128 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# =============================================================================
+# validate.sh
+# Main validation script - runs all validation checks
+# =============================================================================
 
-# SQL Validation Script for CI/CD
-# Validates migration files for naming conventions and basic SQL syntax
+set -euo pipefail
 
-set -e
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-# Colors for output
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-# Counters
-TOTAL_CHECKS=0
-PASSED_CHECKS=0
-FAILED_CHECKS=0
+ERRORS=0
+WARNINGS=0
 
-# Print colored output
-print_success() {
+print_step() {
+    echo -e "${BLUE}$1${NC}"
+}
+
+print_ok() {
     echo -e "${GREEN}✓${NC} $1"
 }
 
-print_error() {
+print_fail() {
     echo -e "${RED}✗${NC} $1"
+    ERRORS=$((ERRORS + 1))
 }
 
-print_warning() {
+print_warn() {
     echo -e "${YELLOW}⚠${NC} $1"
+    WARNINGS=$((WARNINGS + 1))
 }
 
-print_info() {
-    echo -e "${NC}ℹ${NC} $1"
-}
-
-# Check if migration naming follows convention
-check_migration_naming() {
-    local file=$1
-    local filename=$(basename "$file")
-    
-    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-    
-    # Pattern: YYYYMMDDHHMMSS_description.sql
-    if [[ $filename =~ ^[0-9]{14}_[a-z0-9_]+\.sql$ ]]; then
-        print_success "Migration naming: $filename"
-        PASSED_CHECKS=$((PASSED_CHECKS + 1))
-        return 0
-    else
-        print_error "Migration naming: $filename (should be YYYYMMDDHHMMSS_description.sql)"
-        FAILED_CHECKS=$((FAILED_CHECKS + 1))
-        return 1
-    fi
-}
-
-# Check if migration has required header
-check_migration_header() {
-    local file=$1
-    local filename=$(basename "$file")
-    
-    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-    
-    if grep -q "^-- Migration:" "$file" && \
-       grep -q "^-- Description:" "$file" && \
-       grep -q "^-- Author:" "$file" && \
-       grep -q "^-- Date:" "$file"; then
-        print_success "Migration header: $filename"
-        PASSED_CHECKS=$((PASSED_CHECKS + 1))
-        return 0
-    else
-        print_error "Migration header: $filename (missing required header fields)"
-        FAILED_CHECKS=$((FAILED_CHECKS + 1))
-        return 1
-    fi
-}
-
-# Check if migration tracks itself
-check_migration_tracking() {
-    local file=$1
-    local filename=$(basename "$file")
-    
-    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-    
-    if grep -q "INSERT INTO schema_migrations" "$file"; then
-        print_success "Migration tracking: $filename"
-        PASSED_CHECKS=$((PASSED_CHECKS + 1))
-        return 0
-    else
-        print_warning "Migration tracking: $filename (should insert into schema_migrations)"
-        # Don't count as failure, just warning
-        return 0
-    fi
-}
-
-# Basic SQL syntax validation using MySQL client if available
-check_sql_syntax() {
-    local file=$1
-    local filename=$(basename "$file")
-    
-    # Skip if MySQL client not available
-    if ! command -v mysql &> /dev/null; then
-        return 0
-    fi
-    
-    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-    
-    # Basic SQL syntax check - just verify file has valid SQL-like content
-    # Full validation requires a database connection which CI may not have
-    if grep -v "^--" "$file" | grep -v "^[[:space:]]*$" | grep -Eq "(CREATE|ALTER|DROP|INSERT|SELECT|UPDATE|DELETE)" ; then
-        print_success "SQL syntax: $filename"
-        PASSED_CHECKS=$((PASSED_CHECKS + 1))
-        return 0
-    else
-        print_error "SQL syntax: $filename (no SQL statements found)"
-        FAILED_CHECKS=$((FAILED_CHECKS + 1))
-        return 1
-    fi
-}
-
-# Check for common issues
-check_common_issues() {
-    local file=$1
-    local filename=$(basename "$file")
-    
-    local issues_found=0
-    
-    # Check for DROP TABLE without IF EXISTS
-    if grep -qi "DROP TABLE" "$file" && ! grep -qi "DROP TABLE IF EXISTS" "$file"; then
-        print_warning "Safety check: $filename contains DROP TABLE without IF EXISTS"
-        issues_found=$((issues_found + 1))
-    fi
-    
-    # Check for DELETE/TRUNCATE without WHERE (potential data loss)
-    if grep -qi "DELETE FROM" "$file" && ! grep -qi "DELETE FROM.*WHERE" "$file"; then
-        print_warning "Safety check: $filename contains DELETE without WHERE clause"
-        issues_found=$((issues_found + 1))
-    fi
-    
-    # Check for sensitive data patterns
-    if grep -iq "password\s*=\s*['\"].*['\"]" "$file" || \
-       grep -iq "api.key\s*=\s*['\"].*['\"]" "$file" || \
-       grep -iq "secret\s*=\s*['\"].*['\"]" "$file"; then
-        print_error "Security check: $filename may contain sensitive data"
-        issues_found=$((issues_found + 1))
-    fi
-    
-    return 0
-}
-
-# Check for duplicate migration versions
-check_duplicate_versions() {
-    print_info "Checking for duplicate migration versions..."
-    
-    local versions=$(find migrations/ -name "*.sql" 2>/dev/null | xargs -I {} basename {} | cut -d'_' -f1 | sort)
-    local duplicates=$(echo "$versions" | uniq -d)
-    
-    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-    
-    if [ -z "$duplicates" ]; then
-        print_success "No duplicate migration versions found"
-        PASSED_CHECKS=$((PASSED_CHECKS + 1))
-        return 0
-    else
-        print_error "Duplicate migration versions found:"
-        echo "$duplicates"
-        FAILED_CHECKS=$((FAILED_CHECKS + 1))
-        return 1
-    fi
-}
-
-# Main validation
 main() {
-    echo "========================================="
-    echo "  SQL Migration Validation"
-    echo "========================================="
-    echo ""
+    echo "=================================================================="
+    echo "Database Validation - lumanitech_erp_clients"
+    echo "=================================================================="
+    echo
     
-    # Check if migrations directory exists
-    if [ ! -d "migrations" ]; then
-        print_error "migrations/ directory not found"
-        exit 1
+    # Step 1: Validate migration files
+    print_step "Step 1: Validate migration files..."
+    "$SCRIPT_DIR/validate-migrations.sh" || ERRORS=$((ERRORS + 1))
+    echo
+    
+    # Step 2: Validate SQL syntax
+    print_step "Step 2: Validate SQL syntax..."
+    "$SCRIPT_DIR/validate-sql-syntax.sh" || ERRORS=$((ERRORS + 1))
+    echo
+    
+    # Step 3: Validate repository structure
+    print_step "Step 3: Validate repository structure..."
+    for dir in migrations schema seeds scripts docs; do
+        if [[ -d "$PROJECT_ROOT/$dir" ]]; then
+            print_ok "Directory exists: $dir/"
+        else
+            print_fail "Missing directory: $dir/"
+        fi
+    done
+    echo
+    
+    # Step 4: Validate schema structure
+    print_step "Step 4: Validate schema structure..."
+    schema_dir="$PROJECT_ROOT/schema"
+    for subdir in tables views procedures functions triggers indexes; do
+        if [[ -d "$schema_dir/$subdir" ]]; then
+            print_ok "Schema subdirectory exists: $subdir/"
+        else
+            print_fail "Missing schema subdirectory: $subdir/"
+        fi
+    done
+    echo
+    
+    # Step 5: Validate schema file naming
+    print_step "Step 5: Validate schema file naming..."
+    
+    check_dir="$schema_dir/procedures"
+    if [[ -d "$check_dir" ]]; then
+        for f in "$check_dir"/*.sql; do
+            [[ -f "$f" ]] || continue
+            name=$(basename "$f")
+            if [[ ! "$name" =~ ^sp_[a-z0-9_]+\.sql$ ]]; then
+                print_fail "Invalid procedure filename: $name (expected sp_name.sql)"
+            else
+                print_ok "$name"
+            fi
+        done
     fi
     
-    # Get all migration files
-    migration_files=$(find migrations/ -name "*.sql" 2>/dev/null | sort)
-    
-    if [ -z "$migration_files" ]; then
-        print_warning "No migration files found in migrations/"
-        echo ""
-        echo "This is expected for a new repository."
-        exit 0
+    check_dir="$schema_dir/triggers"
+    if [[ -d "$check_dir" ]]; then
+        for f in "$check_dir"/*.sql; do
+            [[ -f "$f" ]] || continue
+            name=$(basename "$f")
+            if [[ ! "$name" =~ ^trg_[a-z0-9_]+\.sql$ ]]; then
+                print_fail "Invalid trigger filename: $name (expected trg_name.sql)"
+            else
+                print_ok "$name"
+            fi
+        done
     fi
-    
-    echo "Found $(echo "$migration_files" | wc -l) migration file(s)"
-    echo ""
-    
-    # Validate each migration
-    while IFS= read -r file; do
-        # Skip template file
-        if [[ "$(basename "$file")" == "TEMPLATE.sql" ]]; then
-            print_info "Skipping template file: $(basename "$file")"
-            echo ""
-            continue
-        fi
-        
-        echo "Validating: $(basename "$file")"
-        check_migration_naming "$file"
-        check_migration_header "$file"
-        check_migration_tracking "$file"
-        check_common_issues "$file"
-        echo ""
-    done <<< "$migration_files"
-    
-    # Check for duplicates
-    check_duplicate_versions
-    echo ""
-    
-    # Validate schema files if they exist
-    if [ -d "schema" ]; then
-        print_info "Checking schema directory structure..."
-        
-        if [ -d "schema/tables" ]; then
-            table_count=$(find schema/tables -name "*.sql" 2>/dev/null | wc -l)
-            print_info "Found $table_count table definition(s)"
-        fi
-        
-        if [ -d "schema/views" ]; then
-            view_count=$(find schema/views -name "*.sql" 2>/dev/null | wc -l)
-            print_info "Found $view_count view definition(s)"
-        fi
-        
-        if [ -d "schema/procedures" ]; then
-            proc_count=$(find schema/procedures -name "*.sql" 2>/dev/null | wc -l)
-            print_info "Found $proc_count stored procedure(s)"
-        fi
-        
-        if [ -d "schema/functions" ]; then
-            func_count=$(find schema/functions -name "*.sql" 2>/dev/null | wc -l)
-            print_info "Found $func_count function(s)"
-        fi
-        echo ""
-    fi
+    echo
     
     # Summary
-    echo "========================================="
-    echo "  Validation Summary"
-    echo "========================================="
-    echo "Total checks: $TOTAL_CHECKS"
-    echo -e "${GREEN}Passed: $PASSED_CHECKS${NC}"
+    echo "=================================================================="
+    echo "Validation Summary"
+    echo "=================================================================="
+    echo "Errors: $ERRORS"
+    echo "Warnings: $WARNINGS"
     
-    if [ $FAILED_CHECKS -gt 0 ]; then
-        echo -e "${RED}Failed: $FAILED_CHECKS${NC}"
-        echo ""
-        print_error "Validation failed! Please fix the issues above."
+    if [[ $ERRORS -gt 0 ]]; then
+        echo -e "${RED}Validation FAILED${NC}"
         exit 1
+    elif [[ $WARNINGS -gt 0 ]]; then
+        echo -e "${YELLOW}Validation passed with warnings${NC}"
+        exit 0
     else
-        echo -e "${RED}Failed: $FAILED_CHECKS${NC}"
-        echo ""
-        print_success "All validations passed!"
+        echo -e "${GREEN}Validation PASSED${NC}"
         exit 0
     fi
 }
 
-# Run main function
-main
+main "$@"

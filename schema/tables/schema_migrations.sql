@@ -1,15 +1,12 @@
--- Schema Migrations Tracking Table
--- This table tracks which migrations have been applied to the database
--- It is automatically managed by the migration system
+-- =============================================================================
+-- Table: schema_migrations
+-- Description: Tracks all applied database migrations
+-- =============================================================================
 
 CREATE TABLE IF NOT EXISTS schema_migrations (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    version VARCHAR(14) NOT NULL UNIQUE COMMENT 'Migration version timestamp (YYYYMMDDHHMMSS)',
-    description VARCHAR(255) NOT NULL COMMENT 'Migration description',
-    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'When the migration was applied',
-    checksum VARCHAR(64) NULL COMMENT 'Optional checksum for migration integrity',
-    
-    INDEX idx_version (version),
+    version VARCHAR(50) PRIMARY KEY COMMENT 'Migration version (e.g., V001, V002)',
+    description VARCHAR(255) NOT NULL COMMENT 'Brief description of the migration',
+    applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'When the migration was applied',
     INDEX idx_applied_at (applied_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-COMMENT='Tracks applied database migrations';
+COMMENT='Tracks all applied database migrations';

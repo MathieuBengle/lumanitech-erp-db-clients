@@ -15,18 +15,18 @@ Migrations are the **source of truth** for database schema changes. They:
 All migration files follow this pattern:
 
 ```
-YYYYMMDDHHMMSS_description.sql
+V###_description.sql
 ```
 
 **Components:**
-- `YYYYMMDDHHMMSS`: Timestamp (year, month, day, hour, minute, second)
+- `V###`: Version number with leading zeros (V001, V002, V003, etc.)
 - `description`: Brief, lowercase, snake_case description
 - `.sql`: SQL file extension
 
 **Examples:**
-- `20231215100000_create_schema_migrations_table.sql`
-- `20231215110000_create_clients_table.sql`
-- `20231215120000_create_active_clients_view.sql`
+- `V001_create_schema_migrations_table.sql`
+- `V002_create_clients_table.sql`
+- `V003_create_active_clients_view.sql`
 
 ## Migration Template
 
@@ -38,14 +38,15 @@ Use `TEMPLATE.sql` as a starting point for new migrations. The template includes
 
 ## Creating a Migration
 
-1. **Generate timestamp:**
+1. **Determine next version number:**
    ```bash
-   date +%Y%m%d%H%M%S
+   # List existing migrations to see the latest version
+   ls migrations/V*.sql | sort | tail -1
    ```
 
 2. **Copy template:**
    ```bash
-   cp migrations/TEMPLATE.sql migrations/20231215143000_your_description.sql
+   cp migrations/TEMPLATE.sql migrations/V004_your_description.sql
    ```
 
 3. **Edit migration:**
@@ -56,7 +57,7 @@ Use `TEMPLATE.sql` as a starting point for new migrations. The template includes
 
 4. **Test locally:**
    ```bash
-   mysql -u root -p database_name < migrations/20231215143000_your_description.sql
+   mysql -u root -p database_name < migrations/V004_your_description.sql
    ```
 
 5. **Validate:**
@@ -106,7 +107,7 @@ for f in migrations/*.sql; do
 done
 
 # Apply specific migration
-mysql -u root -p database_name < migrations/20231215143000_your_description.sql
+mysql -u root -p database_name < migrations/V004_your_description.sql
 
 # Check applied migrations
 mysql -u root -p database_name -e "SELECT version, description, applied_at FROM schema_migrations ORDER BY version;"
@@ -149,10 +150,10 @@ SELECT id, name FROM table_name WHERE active = 1;
 To undo a migration, **create a new migration** that reverses the change:
 
 ```sql
--- Original migration: 20231215143000_add_notes_column.sql
+-- Original migration: V004_add_notes_column.sql
 ALTER TABLE clients ADD COLUMN notes TEXT;
 
--- Rollback migration: 20231216100000_remove_notes_column.sql
+-- Rollback migration: V005_remove_notes_column.sql
 ALTER TABLE clients DROP COLUMN IF EXISTS notes;
 ```
 
@@ -179,8 +180,8 @@ If two developers create migrations at the same time:
 This directory contains:
 
 1. `TEMPLATE.sql` - Template for new migrations (not executed)
-2. `20231215100000_create_schema_migrations_table.sql` - Migration tracking
-3. `20231215110000_create_clients_table.sql` - Main clients table
-4. `20231215120000_create_active_clients_view.sql` - Active clients view
+2. `V001_create_schema_migrations_table.sql` - Migration tracking
+3. `V002_create_clients_table.sql` - Main clients table
+4. `V003_create_active_clients_view.sql` - Active clients view
 
 For detailed migration strategy, see `docs/migration-strategy.md`.

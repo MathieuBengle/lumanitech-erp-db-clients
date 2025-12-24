@@ -45,15 +45,15 @@ Thank you for contributing to the Clients database repository! This guide will h
 
 ### Creating a Migration
 
-1. **Generate timestamp:**
+1. **Determine next version number:**
    ```bash
-   date +%Y%m%d%H%M%S
-   # Example output: 20231215143000
+   # List existing migrations to see the latest version
+   ls migrations/V*.sql | sort | tail -1
    ```
 
 2. **Create migration file:**
    ```bash
-   cp migrations/TEMPLATE.sql migrations/20231215143000_your_description.sql
+   cp migrations/TEMPLATE.sql migrations/V004_your_description.sql
    ```
 
 3. **Edit the migration:**
@@ -66,14 +66,14 @@ Thank you for contributing to the Clients database repository! This guide will h
 4. **Test locally:**
    ```bash
    # Apply your migration
-   mysql -u root -p lumanitech_erp_clients < migrations/20231215143000_your_description.sql
+   mysql -u root -p lumanitech_erp_clients < migrations/V004_your_description.sql
    
    # Verify changes
    mysql -u root -p lumanitech_erp_clients -e "SHOW TABLES;"
    mysql -u root -p lumanitech_erp_clients -e "DESCRIBE clients;"
    
    # Test idempotency (run again)
-   mysql -u root -p lumanitech_erp_clients < migrations/20231215143000_your_description.sql
+   mysql -u root -p lumanitech_erp_clients < migrations/V004_your_description.sql
    ```
 
 5. **Update schema files (if major change):**
@@ -115,7 +115,7 @@ Thank you for contributing to the Clients database repository! This guide will h
 
 ### Before Submitting
 
-- [ ] Migration naming follows convention: `YYYYMMDDHHMMSS_description.sql`
+- [ ] Migration naming follows convention: `V###_description.sql`
 - [ ] Migration has required header fields
 - [ ] SQL is idempotent where possible
 - [ ] Tested locally on fresh database
@@ -129,7 +129,7 @@ Thank you for contributing to the Clients database repository! This guide will h
 
 1. **Commit your changes:**
    ```bash
-   git add migrations/20231215143000_your_description.sql
+   git add migrations/V004_your_description.sql
    git commit -m "Add migration: your_description"
    git push origin feature/your-change-description
    ```
@@ -295,11 +295,12 @@ done
 
 ### Merge Conflicts
 
-If two migrations have the same timestamp:
+If two migrations have the same version number:
 
-1. Regenerate timestamp for your migration:
+1. Renumber your migration to the next available version:
    ```bash
-   date +%Y%m%d%H%M%S
+   # Check latest version
+   ls migrations/V*.sql | sort | tail -1
    ```
 
 2. Rename file and update version in SQL
